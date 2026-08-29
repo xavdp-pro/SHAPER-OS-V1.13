@@ -1,0 +1,101 @@
+{
+  "$schema": "./topology.schema.json",
+  "version": "1.2.0",
+  "description": "SHAPER OS dependency graph & boot order — see overridePolicy",
+
+  "overridePolicy": {
+    "rule": "Silence is the default. Nothing is declared here beyond the graph unless a human explicitly requests an override. All unspecified details are left to the agent, provided they respect each brick INTENT invariants.",
+    "overrideWhen": "A human states a specific constraint (port, path, credential, schema, extra dependency). Then add it to topology.json or a local deps.json — never preemptively."
+  },
+
+  "materializationPipeline": [
+    "intent",
+    "materialize",
+    "test",
+    "registry",
+    "deploy"
+  ],
+  "artifactBoundary": "./artifact-boundary.json",
+
+  "minimalSocle": {
+    "packages": [
+      "@shaper/pkg-vault",
+      "@shaper/pkg-logger",
+      "@shaper/pkg-queue",
+      "@shaper/pkg-maestro",
+      "@shaper/pkg-agent-runtime",
+      "@shaper/pkg-auth",
+      "@shaper/pkg-bridge-agy",
+      "@shaper/pkg-bridge-cursor",
+      "@shaper/pkg-bridge-deepseek",
+      "@shaper/pkg-bridge-opencode",
+      "opencode-bridge",
+      "@shaper/pkg-supervisor"
+    ]
+  },
+
+  "bootLayers": [
+    ["vault", "logger"],
+    ["queue"],
+    ["maestro"]
+  ],
+
+  "nodes": {
+    "vault": {
+      "requires": [],
+      "optional": [],
+      "provides": ["secrets"]
+    },
+    "logger": {
+      "requires": [],
+      "optional": [],
+      "provides": ["audit-log"]
+    },
+    "queue": {
+      "requires": [],
+      "optional": ["logger"],
+      "provides": ["job-queue"]
+    },
+    "maestro": {
+      "requires": ["logger"],
+      "optional": ["vault", "queue"],
+      "provides": ["beat-scheduler"]
+    },
+    "bridge-agy": {
+      "requires": ["vault", "logger"],
+      "optional": ["maestro"],
+      "provides": ["ai-agent-bridge"]
+    },
+    "bridge-opencode": {
+      "requires": ["logger"],
+      "optional": ["maestro"],
+      "provides": ["ai-agent-bridge-free"]
+    },
+    "auth": {
+      "requires": [],
+      "optional": [],
+      "provides": ["bearer-auth"]
+    },
+    "agent": {
+      "requires": ["auth"],
+      "optional": ["vault", "logger"],
+      "provides": ["agent-task-registry"]
+    },
+    "qdrant": {
+      "requires": [],
+      "optional": [],
+      "provides": ["vector-database"],
+      "optionalBrick": true
+    }
+  },
+
+  "packageImports": {
+    "@shaper/pkg-maestro": ["@shaper/pkg-logger", "@shaper/pkg-agent-runtime", "@shaper/pkg-vault"],
+    "@shaper/pkg-agent-runtime": ["@shaper/pkg-auth"],
+    "@shaper/pkg-vault": [],
+    "@shaper/pkg-queue": [],
+    "@shaper/pkg-logger": [],
+    "@shaper/pkg-auth": [],
+    "@shaper/pkg-db": []
+  }
+}

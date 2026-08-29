@@ -1,0 +1,96 @@
+{
+  "$schema": "../../schemas/universe-manifest.schema.json",
+  "universe": "univ-example",
+  "parent": null,
+  "environment": "dev",
+  "dataLifecycle": {
+    "personalData": false,
+    "retention": "unlimited — evidence and configuration only",
+    "onTermination": "destroy all volumes and the vault; nothing is exported"
+  },
+  "profile": "agent",
+  "description": "Template — copy to universes/<slug>/manifest.json and replace every value. Validated on every test run, so a copy that drifts fails immediately.",
+  "intent": "./INTENT.md",
+  "agentDeploy": "./AGENT-DEPLOY.md",
+  "context": "./context/ctx-universe.md",
+  "tasks": "./tasks/task-schedule.json",
+  "bricks": {
+    "brick-vault": {
+      "source": "base",
+      "perimeter": "P1",
+      "package": "@shaper/pkg-vault",
+      "image": "img-vault",
+      "intent": "../../bricks/brick-vault/INTENT.md",
+      "role": "<WHY this brick in THIS universe>",
+      "port": 8510,
+      "specialize": {
+        "how": "Bootstrap from resources/vault-resources.local.json",
+        "file": "../../resources/vault-resources.local.json",
+        "bootstrap": "npm run vault:bootstrap"
+      }
+    },
+    "brick-logger": {
+      "source": "base",
+      "perimeter": "P1",
+      "package": "@shaper/pkg-logger",
+      "image": "img-logger",
+      "intent": "../../bricks/brick-logger/INTENT.md",
+      "role": "<WHY this brick in THIS universe>",
+      "port": 8520
+    },
+    "brick-queue": {
+      "source": "base",
+      "perimeter": "P1",
+      "package": "@shaper/pkg-queue",
+      "image": "img-queue",
+      "intent": "../../bricks/brick-queue/INTENT.md",
+      "role": "<WHY this brick in THIS universe>",
+      "port": 8540
+    },
+    "brick-maestro": {
+      "source": "base",
+      "perimeter": "P2",
+      "package": "@shaper/pkg-maestro",
+      "image": "img-maestro",
+      "intent": "../../bricks/brick-maestro/INTENT.md",
+      "role": "<WHY this brick in THIS universe>",
+      "port": 8530,
+      "specialize": {
+        "how": "MAESTRO_TASKS_FILE → ./tasks/task-schedule.json",
+        "file": "./tasks/task-schedule.json"
+      }
+    },
+    "brick-bridge-opencode": {
+      "source": "base",
+      "perimeter": "P2",
+      "package": "@shaper/pkg-bridge-opencode",
+      "image": "img-bridge-opencode",
+      "intent": "../../bricks/brick-bridge-opencode/INTENT.md",
+      "role": "<WHY this brick in THIS universe>",
+      "port": 4440,
+      "specialize": {
+        "how": "Measure the model from the target host at deployment (Rule 7)"
+      }
+    }
+  },
+  "resources": {
+    "vaultBootstrap": "../../resources/vault-resources.local.json",
+    "maestroTasks": "./tasks/task-schedule.json",
+    "agentContext": "./context/ctx-universe.md"
+  },
+  "bootOrder": [
+    [
+      "brick-vault",
+      "brick-logger"
+    ],
+    [
+      "brick-queue"
+    ],
+    [
+      "brick-bridge-opencode"
+    ],
+    [
+      "brick-maestro"
+    ]
+  ]
+}

@@ -1,0 +1,37 @@
+node_modules/
+.env
+.env.*
+!.env.example
+software/resources/*.local.json
+software/data/vault/
+software/data/backups/
+**sav/tunnel/token
+**/sav/opencode-bridge/token
+software/universes/*/deploy/univ9.env
+software/universes/*/deploy/univ8.env
+software/universes/*/deploy/univ7.env
+**/deploy/env
+*.enc
+*.log
+*.jsonl
+log/
+logs/
+sav/
+**/sav/
+**/log/
+.DS_Store
+dist/
+tmp/
+software/bricks/brick-bridge-opencode/bin/
+e2e-artifacts/
+
+# Corpus de cas difficiles : les images sont reproductibles par
+# terrain et la mesure — pas les 12 Mo de dérivés.
+
+# Sorties brutes des délégations : traces de run, pas du code.
+*.pid
+
+# A universe's own configuration holds its secrets. The .example is tracked; the
+# real one never is, and neither is the volume tree a deployment creates.
+software/universes/*/cfg-*.env
+software/universes/*/.state/

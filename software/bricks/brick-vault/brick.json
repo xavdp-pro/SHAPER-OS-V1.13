@@ -1,0 +1,8 @@
+{
+  "brick": "vault",
+  "contractVersion": 1,
+  "distribution": "base",
+  "buildPackages": ["pkg-logger", "pkg-vault"],
+  "runtimeServices": [],
+  "proof": ["vault health", "encrypted persistence", "logger correlation"]
+}

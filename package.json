@@ -1,0 +1,6 @@
+{
+  "name": "@shaper/os",
+  "version": "1.13.0",
+  "type": "module",
+  "private": true
+}

@@ -1,0 +1,367 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SHAPER OS universe manifest (V1.13)",
+  "description": "A universe declares what it is made of. It never copies a brick, and it never leaves anything about a brick to be guessed: every entry states where the brick comes from (source), which layer it belongs to (perimeter), and — when it diverged from a standard brick — what it forked from (Rule 37). The identifier says WHAT; these fields say WHENCE and WHERE.",
+  "type": "object",
+  "required": [
+    "universe",
+    "environment",
+    "profile",
+    "intent",
+    "bricks",
+    "bootOrder"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "universe": {
+      "type": "string",
+      "pattern": "^univ-[a-z0-9][a-z0-9-]*$",
+      "description": "Universe identity. Carries the univ- layer prefix (docs/architecture/NAMING.md)."
+    },
+    "parent": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^univ-[a-z0-9][a-z0-9-]*$",
+      "description": "Parent supervisor universe for the fractal hierarchy (Rule 23 & Rule 36)."
+    },
+    "forkedFrom": {
+      "type": "object",
+      "description": "Repo-level lineage, mandatory for a Rule 33 fork repo: which upstream class repo this one diverged from, cut at which immutable tag. This is what lets shaper verify enforce the mirror rule (Rules 1 & 37).",
+      "required": [
+        "repo",
+        "atTag"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "repo": {
+          "type": "string"
+        },
+        "atTag": {
+          "type": "string",
+          "pattern": "^v[0-9]"
+        }
+      }
+    },
+    "alerting": {
+      "type": "object",
+      "description": "The declared out-of-band escalation channel (Rule 27). A universe with no declared channel MUST NOT be promoted beyond DEV; the channel is tested at deploy time like any brick.",
+      "required": [
+        "channel"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "channel": {
+          "type": "string",
+          "minLength": 1,
+          "description": "mobile push, mail, Telegram, or an existing prod-alerting relay — whatever actually reaches a human out-of-band."
+        },
+        "target": {
+          "type": "string",
+          "description": "Where the channel delivers. Never a real personal address in a tracked example (Boot Contract 10b)."
+        },
+        "testedAtDeploy": {
+          "type": "boolean",
+          "description": "Set by the deploy proof once the channel has actually fired. An unverified alert path is an absent alert path (Rule 0G)."
+        }
+      }
+    },
+    "dataLifecycle": {
+      "type": "object",
+      "description": "Declared data lifecycle (Rule 31). personalData: false is a valid and common answer, but it must be written, not left silent.",
+      "required": [
+        "personalData",
+        "retention",
+        "onTermination"
+      ],
+      "properties": {
+        "personalData": {
+          "type": "boolean"
+        },
+        "retention": {
+          "type": [
+            "string",
+            "object"
+          ]
+        },
+        "onTermination": {
+          "type": [
+            "string",
+            "object"
+          ]
+        }
+      }
+    },
+    "environment": {
+      "type": "string",
+      "enum": [
+        "prod",
+        "dev",
+        "test"
+      ],
+      "description": "prod (permanent), dev (ephemeral sandbox), test (clean-sheet rebuild)."
+    },
+    "profile": {
+      "type": "string",
+      "pattern": "^(passive|agent)( \\+[a-z]+)*$",
+      "description": "A floor (passive|agent) plus options. See docs/architecture/UNIVERSE-PROFILES.md."
+    },
+    "description": {
+      "type": "string"
+    },
+    "intent": {
+      "type": "string",
+      "description": "Path to this universe's own INTENT.md."
+    },
+    "agentDeploy": {
+      "type": "string",
+      "description": "Path to AGENT-DEPLOY.md."
+    },
+    "context": {
+      "type": "string",
+      "description": "Path to this universe's ctx-* file."
+    },
+    "tasks": {
+      "type": "string",
+      "description": "Path to this universe's task-schedule.json."
+    },
+    "configuration": {
+      "type": "string",
+      "description": "Path to this universe's cfg-* environment template."
+    },
+    "imageLock": {
+      "type": "string",
+      "description": "Path to this universe's cfg-image-lock.json."
+    },
+    "shaperOs": {
+      "type": "string",
+      "description": "Path to the base tree, when the universe sits beside it."
+    },
+    "ports": {
+      "type": "object",
+      "description": "Port allocations for bricks in this universe."
+    },
+    "resources": {
+      "type": "object"
+    },
+    "sshAuthority": {
+      "type": "object",
+      "description": "Fractal SSH authority key pairing (Rule 36).",
+      "additionalProperties": false,
+      "properties": {
+        "parentPublicKey": {
+          "type": "string"
+        },
+        "authorizedKeysPath": {
+          "type": "string",
+          "default": "/root/.ssh/authorized_keys"
+        }
+      }
+    },
+    "bricks": {
+      "type": "object",
+      "minProperties": 1,
+      "description": "Bricks this universe assembles. Keys are brick- identities, never bare names.",
+      "propertyNames": {
+        "pattern": "^brick-[a-z0-9][a-z0-9-]*$"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "source",
+          "perimeter",
+          "image",
+          "intent",
+          "role"
+        ],
+        "additionalProperties": false,
+        "if": {
+          "properties": {
+            "source": {
+              "const": "fork"
+            }
+          }
+        },
+        "then": {
+          "required": [
+            "source",
+            "perimeter",
+            "image",
+            "intent",
+            "role",
+            "forkedFrom"
+          ]
+        },
+        "properties": {
+          "source": {
+            "type": "string",
+            "enum": [
+              "base",
+              "catalogue",
+              "fork",
+              "native"
+            ],
+            "description": "Where this brick comes from (Rule 37). base/catalogue: shipped by that repository, consumed by image+tag. fork: inherited from a standard brick and specialised — forkedFrom becomes mandatory. native: a P3 brick scaffolded inside this class repo (the shaper-tool-scaffold path). Nothing is inferred from a path."
+          },
+          "perimeter": {
+            "type": "string",
+            "enum": [
+              "P1",
+              "P2",
+              "P3"
+            ],
+            "description": "Which layer this brick belongs to (Rule 0A, Rule 37). Perimeter means LAYER, never OWNER — a client-specific brick can be P1."
+          },
+          "forkedFrom": {
+            "type": "object",
+            "description": "Brick-level lineage, mandatory when source is fork: the standard package this brick diverged from, at which version (Rule 37).",
+            "required": [
+              "package",
+              "atVersion"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "package": {
+                "type": "string",
+                "pattern": "^@shaper/pkg-[a-z0-9][a-z0-9-]*$"
+              },
+              "atVersion": {
+                "type": "string"
+              }
+            }
+          },
+          "package": {
+            "type": "string",
+            "pattern": "^@shaper/pkg-[a-z0-9][a-z0-9-]*$",
+            "description": "The pkg- source package this brick is built from, when the base or the catalogue ships one. A brick that wraps a third-party image declares `upstream` instead — brick-mariadb has no @shaper package, and pretending otherwise would be a lie a test can be made to enforce."
+          },
+          "image": {
+            "type": "string",
+            "pattern": "^img-[a-z0-9][a-z0-9-]*$",
+            "description": "The img- registry artefact this brick runs as."
+          },
+          "intent": {
+            "type": "string",
+            "description": "Path to the generic brick INTENT.md."
+          },
+          "role": {
+            "type": "string",
+            "minLength": 1,
+            "description": "WHY this brick exists in THIS universe."
+          },
+          "port": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 65535
+          },
+          "specialize": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "how": {
+                "type": "string"
+              },
+              "file": {
+                "type": "string"
+              },
+              "bootstrap": {
+                "type": "string"
+              },
+              "instances": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "cognition": {
+            "type": "object",
+            "description": "Cognitive requirement of this brick in this universe (docs/architecture/COGNITION.md). Declarative only: no automatic router reads it yet.",
+            "additionalProperties": false,
+            "properties": {
+              "capacityClass": {
+                "type": "string",
+                "enum": [
+                  "heavy-engineering",
+                  "rapid-iteration-ui",
+                  "infra-ops",
+                  "fast-eval"
+                ]
+              },
+              "role": {
+                "type": "string",
+                "enum": [
+                  "requires",
+                  "provides",
+                  "neutral"
+                ],
+                "default": "requires"
+              },
+              "depth": {
+                "type": "string",
+                "enum": [
+                  "D0",
+                  "D1",
+                  "D2",
+                  "D3",
+                  "D4"
+                ]
+              },
+              "throughput": {
+                "type": "string",
+                "enum": [
+                  "T0",
+                  "T1",
+                  "T2",
+                  "T3"
+                ]
+              },
+              "horizon": {
+                "type": "string",
+                "enum": [
+                  "H0",
+                  "H1",
+                  "H2",
+                  "H3"
+                ]
+              },
+              "degraded": {
+                "type": "string",
+                "enum": [
+                  "refuse",
+                  "queue",
+                  "allowed-with-note"
+                ]
+              },
+              "rationale": {
+                "type": "string"
+              }
+            }
+          },
+          "upstream": {
+            "type": "string",
+            "description": "The third-party image this brick wraps, when it is not built from a pkg- package (e.g. docker.io/library/mariadb:11)."
+          }
+        }
+      }
+    },
+    "bootOrder": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Layers of brick- keys. Every brick declared above appears exactly once.",
+      "items": {
+        "type": "array",
+        "minItems": 1,
+        "items": {
+          "type": "string",
+          "pattern": "^brick-[a-z0-9][a-z0-9-]*$"
+        }
+      }
+    }
+  }
+}
