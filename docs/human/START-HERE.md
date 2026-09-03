@@ -84,7 +84,7 @@ Linux · git · Node.js >= 20 · Podman >= 4 · curl · openssl
 Full table (optional keys, R2, Stripe later): [`KEYS-AND-ACCOUNTS.md`](./KEYS-AND-ACCOUNTS.md).  
 Agent should use IDE **browser** to open each link and guide you — see [`examples/agent-KEY-COLLECTION-INTENT.md`](../../examples/agent-KEY-COLLECTION-INTENT.md).
 
-Keys → `software/.env` from [`.env.example`](../../.env.example) (same template as [`software/.env.example`](../../software/.env.example)).  
+Keys → `software/.env` from [`software/.env.example`](../../software/.env.example), the one canonical template (the root `.env.example` is a symlink to it, so `cp .env.example software/.env` from the repo root copies the same file).  
 Optional universe overrides: [`examples/universe.env.example`](../../examples/universe.env.example) → `<univ_slug>-dev/deploy/env`.  
 Tunnel token → `<univ_slug>-dev/sav/tunnel/token` (not git).
 
@@ -96,7 +96,7 @@ Tunnel token → `<univ_slug>-dev/sav/tunnel/token` (not git).
 [`LAW.md`](../../LAW.md) · agent detail: [`AGENTS.md`](../../AGENTS.md) and [`docs/agent/BOOT-CONTRACT.md`](../agent/BOOT-CONTRACT.md).
 
 1. Clone this repo ([`REPOS.md`](./REPOS.md)). Node **≥ 20** (`software/package.json` `engines`).
-2. Copy `.env.example` → `software/.env`. Agent writes `VAULT_MASTER_KEY` and `VAULT_TOKEN`. Human pastes Deepgram/Groq only if `WITH_HELM=1`. **No default keys in scripts.**
+2. Copy `software/.env.example` → `software/.env`. Agent writes `VAULT_MASTER_KEY` and `VAULT_TOKEN`. Human pastes Deepgram/Groq only for tier-b. **No default keys in scripts.**
 3. Copy `software/resources/vault-resources.dev.example.json` → `software/resources/vault-resources.local.json`. Align `masterKey` and `token` with `.env`. **No production mailbox** in DEV.
 4. **Package units only** (must be green on a fresh clone):
 
@@ -115,7 +115,7 @@ Tunnel token → `<univ_slug>-dev/sav/tunnel/token` (not git).
    - Copy [`manifest.tier-a.json`](../../manifest.tier-a.json) → `<univ_slug>-dev/manifest.json`
    - Copy [`examples/universe-AGENT-DEPLOY.md`](../../examples/universe-AGENT-DEPLOY.md) → `AGENT-DEPLOY.md`; lifecycle = **dev**
    - Copy [`software/universes/_template/deploy/podman-up.sh`](../../software/universes/_template/deploy/podman-up.sh) → `<univ_slug>-dev/deploy/podman-up.sh`
-   - Tier-b later: the `agent +web +public` manifest, in the [`SHAPER-OS-BRICKS`](https://github.com/xavdp-pro/SHAPER-OS-BRICKS-V1.13) catalogue and `WITH_HELM=1`
+   - Tier-b later: the `agent +web +public` manifest, in the [`SHAPER-OS-BRICKS`](https://github.com/xavdp-pro/SHAPER-OS-BRICKS-V1.13) catalogue — `brick-helm` is a catalogue brick, and nothing in this repository switches it on
 7. Start (from repo root):
 
    ```bash
@@ -138,7 +138,7 @@ Tunnel token → `<univ_slug>-dev/sav/tunnel/token` (not git).
    cd software && npm run test:live
    ```
 
-   Tier-b: also `npm run test:live:helm`.
+   Tier-b: the cockpit's live tests live in the catalogue, beside `brick-helm` — run them from there. This repository ships no tier-b test script.
 
    If red: **stop**. Fix the stack. Do not comment out tests.
 

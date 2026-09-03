@@ -8,8 +8,8 @@
  *   "payload": {
  *     "message": "What to do (required)",
  *     "conversation": "optional-slug",
- *     "bridgeUrl": "http://127.0.0.1:4340",
- *     "model": "opencode/nemotron-3.5-lightning-free",
+ *     "bridgeUrl": "http://127.0.0.1:4440",
+ *     "model": "<engine>/<model measured at deployment — Rule 7, never a name written here>",
  *     "context": "optional instructions"
  *   },
  *   "totalSteps": 2
@@ -157,7 +157,7 @@ function followViaSse({ fetchImpl, target, conversation, headers }) {
 
 export function startQueueAgentWorker({
   queue,
-  bridgeUrl = process.env.QUEUE_BRIDGE_URL || 'http://127.0.0.1:4340',
+  bridgeUrl = process.env.QUEUE_BRIDGE_URL || 'http://127.0.0.1:4440',
   bridgeToken = process.env.QUEUE_BRIDGE_TOKEN || process.env.BRIDGE_AUTH_TOKEN || '',
   pollMs = Number(process.env.QUEUE_POLL_MS || 2000),
   // How many jobs may run at once. One by default: a queue that quietly

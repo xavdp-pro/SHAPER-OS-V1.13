@@ -41,15 +41,31 @@ function canonFiles() {
     // rule does. The model pinned in .env.example, in a Containerfile, in a deploy
     // script and in a package source had been withdrawn from its catalogue while
     // the suite stayed green — because the guard only read Markdown.
+    //
+    // Every package, not two. The first sweep read only the opencode packages,
+    // and a pinned Composer version, a pinned Ollama model, a Gemini fallback
+    // and a worked example in the queue consumer naming the very model the
+    // clean-sheet record documents as withdrawn all survived it — each one a
+    // default the guard was written to refuse, sitting one directory over.
+    // The universe template's deploy script is read for the same reason: it
+    // pinned a second, different version of the model a package pinned.
+    //
+    // A package manifest is read too. The review of that sweep found two
+    // `description` fields still naming a Composer version and a DeepSeek
+    // generation: a manifest is what a registry and a reader see first, so a
+    // version there is a promise about the engine exactly like one in code.
     out.split('\0').filter(Boolean).filter((rel) => {
       if (rel.startsWith('software/bricks/brick-helm/app/')) return false;
       // A parser test needs realistic input, and a test ships no default to
       // production. Fixtures are data; only what runs is a promise.
       if (/\.test\.[cm]?js$/.test(rel)) return false;
+      if (/\/(test|tests|fixtures?|__fixtures__)\//.test(rel)) return false;
       return /\.env\.example$/.test(rel)
         || /(^|\/)Containerfile$/.test(rel)
         || /^examples\/deploy\/.*\.sh$/.test(rel)
-        || /^software\/packages\/(pkg-bridge-opencode|pkg-opencode-server)\/[^/]+\.(js|mjs)$/.test(rel);
+        || /^software\/universes\/_template\/deploy\/podman-up\.sh$/.test(rel)
+        || /^software\/packages\/[^/]+\/package\.json$/.test(rel)
+        || /^software\/packages\/[^/]+\/.*\.(js|mjs|cjs)$/.test(rel);
     }),
   ).filter((rel) => {
     return true;
@@ -68,6 +84,10 @@ const VERSIONED_MODEL = new RegExp(
   [
     'claude[- ]?\\d',
     'gpt[- ]?\\d',
+    // An open-weight family is versioned by its name as much as by a digit: the
+    // deepseek bridge's Containerfile pinned one such family with a parameter
+    // count, and the guard read the line and let it through.
+    'gpt[- ]?oss',
     'gemini[- ]?\\d',
     'grok[- ]?\\d',
     'llama[- ]?\\d',
@@ -99,6 +119,35 @@ describe('the canon names no model', () => {
       + 'that vendor ships a successor, and the rule will quietly recommend the past. '
       + 'Declare the required depth and throughput instead '
       + `(docs/architecture/COGNITION.md):\n  ${violations.join('\n  ')}\n`,
+    );
+  });
+
+  /**
+   * An example env file is a default with the operator's name on it: whatever
+   * value it ships is what every deployment starts from. The versioned-name
+   * pattern above let one through — `GROQ_ACK_MODEL=groq/compound-mini`, the
+   * voice acknowledgement engine, shipped in both .env.example files with no
+   * digit in its name — so the rule for these files is the variable's shape,
+   * not the vendor's spelling: a variable named `*_MODEL` carries no value.
+   * It is measured at deploy, never written here (Rule 7).
+   */
+  it('no tracked .env.example gives a *_MODEL variable a value', () => {
+    const shipped = [];
+    const out = execFileSync('git', ['-C', REPO, 'ls-files', '-z'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+    const examples = out.split('\0').filter((rel) => /\.env\.example$/.test(rel) && fs.existsSync(path.join(REPO, rel)));
+    assert.ok(examples.length > 0, 'the tree ships at least one .env.example');
+    for (const rel of examples) {
+      fs.readFileSync(path.join(REPO, rel), 'utf8').split('\n').forEach((line, i) => {
+        const m = /^\s*#?\s*([A-Z][A-Z0-9_]*_MODEL)=(.+)$/.exec(line);
+        if (m && m[2].trim()) shipped.push(`${rel}:${i + 1}  ${m[1]}=${m[2].trim()}`);
+      });
+    }
+    assert.deepEqual(
+      shipped,
+      [],
+      'A model shipped as a value in an example env file is a default, and a default '
+      + 'that must be edited when a vendor ships a successor is a cache, not a rule '
+      + `(Rule 7). Declare the variable empty and measure it at deploy:\n  ${shipped.join('\n  ')}\n`,
     );
   });
 

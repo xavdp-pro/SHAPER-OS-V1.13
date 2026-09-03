@@ -47,26 +47,73 @@ fi
 # halted on its own halt-check; a cold tester reported patching this script (run
 # without an on-disk report), and a second tester confirmed the clobbering. Same principle as the vault's storage file (V1.13.1): an explicit
 # choice always beats a packaged default.
-KEEP_VARS=(OPENCODE_MODEL SHAPER_REGISTRY SHAPER_IMAGE_TAG SHAPER_TLS_VERIFY
+#
+# Every model variable a bridge below reads is listed, under each name the
+# bridge accepts: after the Rule 7 sweep the cursor and agy bridges halt
+# without a measured model exactly as opencode does, and a `CURSOR_MODEL=`
+# left in a .env would otherwise blank the engine the operator exported and
+# trip that halt — the defect above, met again one bridge over.
+KEEP_VARS=(OPENCODE_MODEL CURSOR_MODEL AGY_MODEL ANTIGRAVITY_MODEL
+           SHAPER_REGISTRY SHAPER_IMAGE_TAG SHAPER_TLS_VERIFY
            VAULT_MASTER_KEY VAULT_TOKEN APP_PASSWORD MAESTRO_QUEUE_URL)
 for v in "${KEEP_VARS[@]}"; do declare -g "__KEEP_$v=${!v:-}"; done
 
+# A variables file holds only variables. `source` EXECUTES every line that is
+# not blank, a comment, or KEY=value — and on the first night Rule 11 ran in
+# production a human note slipped into tokens.env (`BACKOFFICE_ADMIN = email /
+# password`) was run as a command: the deploy died before it could print its
+# own halt (docs/proof/proof-rule-11-in-production.md, lesson 7). So every
+# file is read before it is sourced, and the first line that is not a
+# variable stops the deploy, quoted, with its number. Keys may carry digits
+# (R2_BUCKET_NAME is a variable); a note for a human goes behind #.
+#
+# The value is held to the same standard as the key. A first version admitted
+# any `KEY=value`, and its reviewer showed that `KEY=1; echo INJECTED` passed
+# and was then run by source. A value is a double-quoted string (no `$(…)`,
+# no backtick — bash expands those inside double quotes), a single-quoted
+# string, or a bare word carrying no whitespace and no shell operator
+# (`; & | ( ) < >` and quotes): `KEY=a b` runs `b`, `KEY=a>b` writes a file.
+# This grep and ENV_VALUE in scripts/lib/preflight-checks.mjs are the same
+# grammar; a test feeds both the same lines.
+shaper_env_file_is_variables_only() {
+  local file="$1" bad status=0
+  # grep -v selects the lines that are NOT admitted. Its exit code is read
+  # explicitly rather than hidden behind `|| true`: 1 means no line was
+  # selected — the file is clean, the good outcome — and 2 means grep could
+  # not read the file, which is a halt of its own, never a pass.
+  bad="$(grep -nvE '^[[:space:]]*(#|$)|^[A-Z][A-Z0-9_]*=("([^"`$]|\$[^(])*\$?"|'"'"'[^'"'"']*'"'"'|[^[:blank:];&|()<>`'"'"'"]*)$' "$file")" || status=$?
+  if (( status == 1 )); then
+    return 0
+  elif (( status == 2 )); then
+    echo "[podman-up] cannot read $file — a file that cannot be checked is not sourced" >&2
+    return 1
+  fi
+  echo "[podman-up] $file is not a variables file — these lines would be EXECUTED by source, not exported:" >&2
+  echo "$bad" | sed 's/^/[podman-up]   line /' >&2
+  echo "[podman-up] only blank lines, # comments and KEY=value are allowed, the value quoted or a bare word without whitespace or shell operators; put a note for a human behind #" >&2
+  return 1
+}
+shaper_source_env() {
+  shaper_env_file_is_variables_only "$1" || exit 1
+  set -a; source "$1"; set +a
+}
+
 # 1. Base defaults from software/.env or root .env
 if [[ -f "$SHAPER/.env" ]]; then
-  set -a; source "$SHAPER/.env"; set +a
+  shaper_source_env "$SHAPER/.env"
 elif [[ -f "$REPO_ROOT/.env" ]]; then
-  set -a; source "$REPO_ROOT/.env"; set +a
+  shaper_source_env "$REPO_ROOT/.env"
 fi
 
 # 2. Universe overrides (takes highest precedence)
 if [[ -n "${ENV_FILE:-}" && -f "$ENV_FILE" ]]; then
-  set -a; source "$ENV_FILE"; set +a
+  shaper_source_env "$ENV_FILE"
 elif [[ -f "$UNIV/.env" ]]; then
-  set -a; source "$UNIV/.env"; set +a
+  shaper_source_env "$UNIV/.env"
 elif [[ -f "$UNIV/deploy/env" ]]; then
-  set -a; source "$UNIV/deploy/env"; set +a
+  shaper_source_env "$UNIV/deploy/env"
 elif [[ -f "$UNIV/deploy/${SLUG}.env" ]]; then
-  set -a; source "$UNIV/deploy/${SLUG}.env"; set +a
+  shaper_source_env "$UNIV/deploy/${SLUG}.env"
 fi
 
 # The operator's explicit exports come back on top of every file.
@@ -93,8 +140,12 @@ IMG_QUEUE="$(shaper_image_ref img-queue)"
 IMG_MAESTRO="$(shaper_image_ref img-maestro)"
 
 # Ports: the manifest declares them; env may override; these defaults are the
-# last resort. Until V1.13.1 the manifest said one family and this script
-# hardcoded another, and `test:live` failed as documented (beta finding F5).
+# last resort. Beta finding F5: the manifest said one family and this script
+# hardcoded another, and `test:live` failed as documented. V1.13.1 made this
+# script read the manifest — and only this script: the rest of the tree kept
+# the old family until the release after v1.13.34, when one family was written
+# everywhere and the one-port-family guard was born
+# (pkg-universe/test/one-port-family.test.js, docs/architecture/BRICKS.md).
 manifest_port() {
   python3 - "$UNIV/manifest.json" "$1" "$2" 2>/dev/null <<'PY' || echo "$2"
 import json, sys
@@ -268,6 +319,13 @@ podman run -d --name "${SLUG}-bridge-opencode" --network "$NET" --replace \
 
 if [[ "$WITH_BRIDGE_CURSOR" == "1" ]]; then
   echo "[podman-up] bridge-cursor :$CURSOR_BRIDGE_PORT"
+  # No default model — Rule 7, same contract as OPENCODE_MODEL above. Until the
+  # Rule 7 sweep this line pinned a Composer version the bridge did not even
+  # read; the bridge now halts without CURSOR_MODEL, so refuse here, where the
+  # message is readable, rather than in a crash-looping container.
+  if [[ "${BRIDGE_CURSOR_STUB:-0}" != "1" ]]; then
+    : "${CURSOR_MODEL:?not set — bridge-cursor is enabled and names no default model (Rule 7): measure the engines reachable from this host and export CURSOR_MODEL=<model id>}"
+  fi
   # cursor-agent is a separate CLI from the IDE. Mounted read-only from the host
   # so the image carries no binary it cannot version.
   podman run -d --name "${SLUG}-bridge-cursor" --network "$NET" --replace \
@@ -276,7 +334,7 @@ if [[ "$WITH_BRIDGE_CURSOR" == "1" ]]; then
     -e BRIDGE_CURSOR_STUB="${BRIDGE_CURSOR_STUB:-0}" \
     -e CURSOR_BIN=/usr/local/bin/cursor-agent \
     -e CURSOR_API_KEY="${CURSOR_API_KEY:-}" \
-    -e CURSOR_MODEL="${CURSOR_MODEL:-composer-2.5}" \
+    -e CURSOR_MODEL="${CURSOR_MODEL:-}" \
     -e CURSOR_MODE="${CURSOR_MODE:-normal}" \
     ${CURSOR_AGENT_DIR:+-v "${CURSOR_AGENT_DIR}:/opt/cursor-agent:ro"} \
     ${CURSOR_AGENT_DIR:+-e CURSOR_BIN=/opt/cursor-agent/cursor-agent} \
@@ -286,6 +344,11 @@ fi
 
 if [[ "$WITH_BRIDGE_AGY" == "1" ]]; then
   echo "[podman-up] bridge-agy :$AGY_BRIDGE_PORT"
+  # No default model — Rule 7, same contract as OPENCODE_MODEL above. Until the
+  # Rule 7 sweep this line pinned one version and the package pinned another:
+  # two defaults for one bridge, neither measured. The real bridge is forced on
+  # below, so a model is always required here.
+  : "${AGY_MODEL:?not set — bridge-agy is enabled and names no default model (Rule 7): measure the engines reachable from this host and export AGY_MODEL=<model id>}"
   # BRIDGE_AGY_STUB=1 is baked into the image; it must be overridden explicitly
   # or the bridge stays simulated while answering healthy.
   podman run -d --name "${SLUG}-bridge-agy" --network "$NET" --replace \
@@ -293,7 +356,7 @@ if [[ "$WITH_BRIDGE_AGY" == "1" ]]; then
     -e AGY_BRIDGE_PORT="$AGY_BRIDGE_PORT" \
     -e BRIDGE_AGY_STUB=0 \
     -e AGY_BIN=/usr/local/bin/agy \
-    -e AGY_MODEL="${AGY_MODEL:-gemini-3.7-flash-low}" \
+    -e AGY_MODEL="$AGY_MODEL" \
     ${AGY_HOST_BIN:+-v "${AGY_HOST_BIN}:/usr/local/bin/agy:ro"} \
     ${AGY_HOST_HOME:+-v "${AGY_HOST_HOME}:/root/.gemini"} \
     -v "${WORK_ROOT}:${WORK_ROOT}:Z" \
